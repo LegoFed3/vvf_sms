@@ -8,12 +8,16 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import requests
+import logging as log
+import sys
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/contacts.readonly']
 
 
 def main():
+    log.info("VVF SMS starting...")
+
     # Load SMSMODE API key
     with open("./smsmode_api.txt") as f:
         sms_api_key = f.read()
@@ -38,7 +42,7 @@ def main():
 
     try:
         # Get contacts from the People API
-        print('Getting contacts...')
+        log.info('Getting contacts...')
         people_service = build('people', 'v1', credentials=creds)
         people = people_service.people().connections().list(
             resourceName='people/me',
@@ -59,13 +63,13 @@ def main():
         cal_service = build('calendar', 'v3', credentials=creds)
         now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
         tomorrow = (datetime.datetime.utcnow() + datetime.timedelta(days=1)).isoformat() + 'Z'  # 'Z' indicates UTC time
-        print('Getting upcoming events...')
+        log.info('Getting upcoming events...')
         events_result = cal_service.events().list(calendarId='primary', timeMin=now, timeMax=tomorrow,
                                                   singleEvents=True, orderBy='startTime').execute()
         events = events_result.get('items', [])
 
         if not events:
-            print('No upcoming events found.')
+            log.info('No upcoming events found.')
             return
 
         # Process events
@@ -73,16 +77,16 @@ def main():
             time.sleep(1)
             start = event['start'].get('dateTime', event['start'].get('date'))
             if _needs_reminder(event):
-                print(f"Sending reminders for event {start} {event['summary']}")
+                log.info(f"Sending reminders for event {start} {event['summary']}")
                 _send_sms_reminders(event, people, sms_api_key)
                 _set_reminded(event, cal_service)
             else:
-                print(f"Skipping event {start} {event['summary']}")
+                log.info(f"Skipping event {start} {event['summary']}")
 
     except HttpError as error:
-        print('An error occurred: %s' % error)
+        log.error('An error occurred: %s' % error)
 
-    print('Done.')
+    log.info('Done.')
 
 
 def _needs_reminder(event):
@@ -107,25 +111,28 @@ def _send_sms_reminders(event, people, api_key):
             # Do not remind the organizer - service account
             continue
         email = attendee['email']
-        if email in people:
-            phone = people[email]
-            msg = f"Ricordati dell'evento '{event['summary']}' il {_start_date(event)} alle {_start_time(event)}."
-            headers = {'X-Api-Key': api_key}
-            body = {
-                "recipient": {
-                    "to": phone
-                },
-                "body": {
-                    "text": msg
-                }
+
+        if email not in people:
+            log.warning(f"Did not send SMS to '{email}' as I do not have the phone number.")
+            return
+
+        phone = people[email]
+        msg = f"Ricordati dell'evento '{event['summary']}' il {_start_date(event)} alle {_start_time(event)}."
+        headers = {'X-Api-Key': api_key}
+        body = {
+            "recipient": {
+                "to": phone
+            },
+            "body": {
+                "text": msg
             }
-            r = requests.post("https://rest.smsmode.com/sms/v1/messages", json=body, headers=headers)
-            if r.status_code == 200:
-                print(f"Sent SMS '{msg}' to '{email} at {phone}.")
-            else:
-                print(f"Error in sending SMS to '{email} at {phone}: {r.status_code} {r.reason}")
-        else:
-            print(f"Did not send SMS to '{email}' as I do not have the phone number.")
+        }
+        # r = requests.post("https://rest.smsmode.com/sms/v1/messages", json=body, headers=headers)
+        # if r.status_code == 200:
+        #     log.info(f"Sent SMS request for '{msg}' to '{email} at {phone}.")
+        #     log.debug(f"Response:\n{r.text}")
+        # else:
+        #     log.error(f"Error in sending SMS to '{email} at {phone}: {r.status_code} {r.reason}")
     return
 
 
@@ -154,4 +161,6 @@ def _start_time(event):
 
 
 if __name__ == '__main__':
+    log.basicConfig(filename='vvf_sms.log', encoding='utf-8', level=log.DEBUG, format='%(asctime)s %(message)s')
+    log.getLogger().addHandler(log.StreamHandler(sys.stdout))
     main()
