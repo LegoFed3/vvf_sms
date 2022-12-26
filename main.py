@@ -19,7 +19,7 @@ def main():
     log.info("VVF SMS starting...")
 
     # Load SMSMODE API key
-    with open("./smsmode_api.txt") as f:
+    with open("./smsmode_api_key.txt") as f:
         sms_api_key = f.read()
 
     # Load Google credentials
@@ -56,6 +56,8 @@ def main():
             phone = person.get('phoneNumbers', [])
             if phone:
                 phone = phone[0].get('value')
+                if phone[0:3] != "+39":
+                    phone = "+39"+phone
             if email and phone:
                 people[email] = phone.replace(" ", "")
 
@@ -90,6 +92,8 @@ def main():
 
 
 def _needs_reminder(event):
+    if event['summary'] == "TESTSMS":
+        return True
     if 'description' in event and 'REMINDED' in event['description']:
         return False
     if event['summary'] in ['Servizio Notturno', 'Servizio Festivo', 'Servizio Sabato']:
@@ -118,21 +122,21 @@ def _send_sms_reminders(event, people, api_key):
 
         phone = people[email]
         msg = f"Ricordati dell'evento '{event['summary']}' il {_start_date(event)} alle {_start_time(event)}."
-        headers = {'X-Api-Key': api_key}
-        body = {
-            "recipient": {
-                "to": phone
-            },
-            "body": {
-                "text": msg
-            }
+        headers = {
+            'Accept': 'application/json',
+            'Content-type': 'application/json',
+            'X-Api-Key': api_key,
         }
-        # r = requests.post("https://rest.smsmode.com/sms/v1/messages", json=body, headers=headers)
-        # if r.status_code == 200:
-        #     log.info(f"Sent SMS request for '{msg}' to '{email} at {phone}.")
-        #     log.debug(f"Response:\n{r.text}")
-        # else:
-        #     log.error(f"Error in sending SMS to '{email} at {phone}: {r.status_code} {r.reason}")
+        body = {
+            "recipient": {"to": phone},
+            "body": {"text": msg}
+        }
+        r = requests.post("https://rest.smsmode.com/sms/v1/messages", json=body, headers=headers)
+        if r.status_code in [200, 201]:
+            log.info(f"Sent SMS request for '{msg}' to '{email} at {phone}.")
+            log.debug(f"Response:{r.text}")
+        else:
+            log.error(f"Error in sending SMS to '{email} at {phone}: {r.status_code} {r.reason}{r.text}")
     return
 
 

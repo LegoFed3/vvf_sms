@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 credentials.json
 token.json
-smsmode_api.txt
+smsmode_api_key.txt
 .idea/
