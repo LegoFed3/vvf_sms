@@ -98,13 +98,15 @@ def _needs_reminder(event):
         return False
     if event['summary'] in ['Servizio Notturno', 'Servizio Festivo', 'Servizio Sabato']:
         return True
-    if 'Reperibilità' in event['summary']:
+    if 'Reperibilità ' in event['summary']:
         return True
-    if 'RIUNIONE' in event['summary'].upper():
+    if 'RIUNIONE ' in event['summary'].upper():
         return True
-    if 'ASSEMBLEA' in event['summary'].upper():
+    if 'ASSEMBLEA ' in event['summary'].upper():
         return True
-    if 'MANOVRA' in event['summary'].upper():
+    if 'MANOVRA ' in event['summary'].upper():
+        return True
+    if 'CORSO ' in event['summary'].upper():
         return True
     return False
 
