@@ -7,12 +7,18 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import requests
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/contacts.readonly']
 
 
 def main():
+    # Load SMSMODE API key
+    with open("./smsmode_api.txt") as f:
+        sms_api_key = f.read()
+
+    # Load Google credentials
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -68,7 +74,7 @@ def main():
             start = event['start'].get('dateTime', event['start'].get('date'))
             if _needs_reminder(event):
                 print(f"Sending reminders for event {start} {event['summary']}")
-                _send_sms_reminders(event, people)
+                _send_sms_reminders(event, people, sms_api_key)
                 _set_reminded(event, cal_service)
             else:
                 print(f"Skipping event {start} {event['summary']}")
@@ -93,7 +99,7 @@ def _needs_reminder(event):
     return False
 
 
-def _send_sms_reminders(event, people):
+def _send_sms_reminders(event, people, api_key):
     if 'attendees' not in event:
         return
     for attendee in event['attendees']:
@@ -104,8 +110,20 @@ def _send_sms_reminders(event, people):
         if email in people:
             phone = people[email]
             msg = f"Ricordati dell'evento '{event['summary']}' il {_start_date(event)} alle {_start_time(event)}."
-            # TODO: send SMS
-            print(f"Sent SMS '{msg}' to '{email} at {phone}.")
+            headers = {'X-Api-Key': api_key}
+            body = {
+                "recipient": {
+                    "to": phone
+                },
+                "body": {
+                    "text": msg
+                }
+            }
+            r = requests.post("https://rest.smsmode.com/sms/v1/messages", json=body, headers=headers)
+            if r.status_code == 200:
+                print(f"Sent SMS '{msg}' to '{email} at {phone}.")
+            else:
+                print(f"Error in sending SMS to '{email} at {phone}: {r.status_code} {r.reason}")
         else:
             print(f"Did not send SMS to '{email}' as I do not have the phone number.")
     return
