@@ -104,6 +104,8 @@ def _needs_reminder(event):
         return True
     if 'ASSEMBLEA' in event['summary'].upper():
         return True
+    if 'MANOVRA' in event['summary'].upper():
+        return True
     return False
 
 
