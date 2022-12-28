@@ -118,11 +118,16 @@ def _send_sms_reminders(event, people, api_key):
         if 'organizer' in attendee and attendee['organizer']:
             # Do not remind the organizer - service account
             continue
+
         email = attendee['email']
+
+        if 'responseStatus' in attendee and attendee['responseStatus'] == 'declined':
+            log.warning(f"Did not send SMS to '{email}' because they declined the invitation.")
+            continue
 
         if email not in people:
             log.warning(f"Did not send SMS to '{email}' as I do not have the phone number.")
-            return
+            continue
 
         phone = people[email]
         msg = f"Ricordati dell'evento '{event['summary']}' il {_start_date(event)} alle {_start_time(event)}."
@@ -136,6 +141,7 @@ def _send_sms_reminders(event, people, api_key):
             "body": {"text": msg}
         }
         r = requests.post("https://rest.smsmode.com/sms/v1/messages", json=body, headers=headers)
+
         if r.status_code in [200, 201]:
             log.info(f"Sent SMS request for '{msg}' to '{email} at {phone}.")
             log.debug(f"Response:{r.text}")
