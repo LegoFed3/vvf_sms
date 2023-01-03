@@ -131,3 +131,4 @@ credentials.json
 token.json
 smsmode_api_key.txt
 .idea/
+sms.to.txt

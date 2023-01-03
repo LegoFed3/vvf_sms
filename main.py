@@ -19,7 +19,7 @@ def main():
     log.info("VVF SMS starting...")
 
     # Load SMSMODE API key
-    with open("./smsmode_api_key.txt") as f:
+    with open("./sms.to.txt") as f:
         sms_api_key = f.read()
 
     # Load Google credentials
@@ -76,7 +76,6 @@ def main():
 
         # Process events
         for event in events:
-            time.sleep(1)
             start = event['start'].get('dateTime', event['start'].get('date'))
             if _needs_reminder(event):
                 log.info(f"Sending reminders for event {start} {event['summary']}")
@@ -96,6 +95,8 @@ def _needs_reminder(event):
         return True
     if 'description' in event and 'REMINDED' in event['description']:
         return False
+    if 'description' in event and 'RICORDA' in event['description']:
+        return True
     if event['summary'] in ['Servizio Notturno', 'Servizio Festivo', 'Servizio Sabato']:
         return True
     if 'Reperibilità ' in event['summary']:
@@ -129,24 +130,29 @@ def _send_sms_reminders(event, people, api_key):
             log.warning(f"Did not send SMS to '{email}' as I do not have the phone number.")
             continue
 
+        # Avoid overwhelming the API
+        time.sleep(1)
+
         phone = people[email]
         msg = f"Ricordati dell'evento '{event['summary']}' il {_start_date(event)} alle {_start_time(event)}."
         headers = {
-            'Accept': 'application/json',
-            'Content-type': 'application/json',
-            'X-Api-Key': api_key,
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
         }
         body = {
-            "recipient": {"to": phone},
-            "body": {"text": msg}
+            "message": msg,
+            "to": phone,
+            "bypass_optout": True,
+            "sender_id": "VVF Arco",
+            # "callback_url": "https://example.com/callback/handler"
         }
-        r = requests.post("https://rest.smsmode.com/sms/v1/messages", json=body, headers=headers)
+        r = requests.post("https://api.sms.to/sms/send", json=body, headers=headers)
 
         if r.status_code in [200, 201]:
             log.info(f"Sent SMS request for '{msg}' to '{email} at {phone}.")
             log.debug(f"Response:{r.text}")
         else:
-            log.error(f"Error in sending SMS to '{email} at {phone}: {r.status_code} {r.reason}{r.text}")
+            log.error(f"Error in sending SMS to '{email} at {phone}: {r.status_code} {r.text}")
     return
 
 
