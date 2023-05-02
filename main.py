@@ -143,7 +143,7 @@ def _send_sms_reminders(event, people, api_key):
             "message": msg,
             "to": phone,
             "bypass_optout": True,
-            "sender_id": "VVF Arco",
+            "sender_id": "VdF Arco",
             # "callback_url": "https://example.com/callback/handler"
         }
         r = requests.post("https://api.sms.to/sms/send", json=body, headers=headers)
